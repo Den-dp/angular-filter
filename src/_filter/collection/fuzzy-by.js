@@ -8,32 +8,59 @@
  */
 angular.module('a8m.fuzzy-by', [])
   .filter('fuzzyBy', ['$parse', function ( $parse ) {
-    return function (collection, property, search, csensitive) {
+    return function (collection, properties, search, csensitive) {
 
-      var sensitive = csensitive || false,
-        prop, getter;
+      var sensitive = csensitive || false;
 
       collection = isObject(collection) ? toArray(collection) : collection;
 
-      if(!isArray(collection) || isUndefined(property)
+      if(!isArray(collection) || isUndefined(properties)
         || isUndefined(search)) {
         return collection;
       }
 
-      getter = $parse(property);
+      if (!isArray(search)) {
+        search = [search];
+      }
 
-      return collection.filter(function(elm) {
+      function compareFn(item, phrase) {
+          item = (sensitive) ? item : item.toLowerCase();
+          phrase = (sensitive) ? phrase: phrase.toLowerCase();
 
-        prop = getter(elm);
-        if(!isString(prop)) {
-          return false;
-        }
+          return hasApproxPattern(item, phrase) !== false;
+      }
 
-        prop = (sensitive) ? prop : prop.toLowerCase();
-        search = (sensitive) ? search : search.toLowerCase();
+      function filterFn(terms, props, elm) {
+          if(!isArray(props)) {
+              props = [props];
+          }
 
-        return hasApproxPattern(prop, search) !== false
-      })
+          if(!isArray(terms)) {
+              terms = [terms];
+          }
+
+          return terms.every(function (searchPhrase) {
+              return props.some(function (prop) {
+                  var value = $parse(prop)(elm);
+
+                  if(!isString(value) && !isArray(value)) {
+                      return false;
+                  }
+
+                  if(!isArray(value)) {
+                      value = [value];
+                  }
+
+                  return value.some(function (item) {
+                      return compareFn(item, searchPhrase);
+                  });
+              });
+          })
+      }
+
+      return collection.filter(function (elm) {
+          return filterFn(search, properties, elm);
+      });
     }
 
  }]);
